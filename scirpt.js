@@ -1,198 +1,211 @@
+// ===== CANVAS =====
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
 
-// FULLSCREEN
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-resize();
-window.addEventListener("resize", resize);
+// ===== GAME STATE =====
+let gameRunning = false;
+let currentLevel = 1;
+let money = 0;
 
-// PLAYER
+// ===== SPEED =====
+const PLAYER_BULLET_SPEED = 10;
+const ENEMY_BULLET_SPEED = PLAYER_BULLET_SPEED / 2;
+
+// ===== PLAYER =====
 const player = {
   x: canvas.width / 2,
-  y: canvas.height - 100,
-  size: 40,
-  speed: 7,
-  bulletSpeed: 12
+  y: canvas.height / 2,
+  r: 15,
+  speed: 4,
+  angle: 0,
+  hp: 10,
+  maxAmmo: 10,
+  ammo: 10,
+  reloading: false
 };
 
-// DATA
+// ===== DATA =====
 let bullets = [];
 let enemyBullets = [];
 let enemies = [];
-let score = 0;
-let level = 1;
 
-let moveLeft = false;
-let moveRight = false;
-let mouseX = canvas.width / 2;
-let mouseY = 0;
+// ===== INPUT =====
+const keys = {};
+addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
-// TOUCH CONTROL (MOBILE)
-const leftBtn = document.getElementById("left");
-const rightBtn = document.getElementById("right");
-const shootBtn = document.getElementById("shoot");
-
-if (leftBtn) {
-  leftBtn.ontouchstart = () => moveLeft = true;
-  leftBtn.ontouchend   = () => moveLeft = false;
-}
-if (rightBtn) {
-  rightBtn.ontouchstart = () => moveRight = true;
-  rightBtn.ontouchend   = () => moveRight = false;
-}
-if (shootBtn) {
-  shootBtn.ontouchstart = shootPlayer;
-}
-
-// MOUSE AIM (PC)
+// ===== MOUSE AIM =====
 canvas.addEventListener("mousemove", e => {
-  mouseX = e.clientX;
-  mouseY = e.clientY;
+  const r = canvas.getBoundingClientRect();
+  const mx = e.clientX - r.left;
+  const my = e.clientY - r.top;
+  player.angle = Math.atan2(my - player.y, mx - player.x);
 });
-canvas.addEventListener("click", shootPlayer);
 
-// SHOOT PLAYER
+// ===== SHOOT =====
+canvas.addEventListener("mousedown", e => {
+  if (e.button === 0) shootPlayer();
+});
+
 function shootPlayer() {
-  const dx = mouseX - player.x;
-  const dy = mouseY - player.y;
-  const len = Math.hypot(dx, dy) || 1;
+  if (player.ammo <= 0 || player.reloading) return;
 
   bullets.push({
     x: player.x,
     y: player.y,
-    vx: (dx / len) * player.bulletSpeed,
-    vy: (dy / len) * player.bulletSpeed
+    vx: Math.cos(player.angle) * PLAYER_BULLET_SPEED,
+    vy: Math.sin(player.angle) * PLAYER_BULLET_SPEED
   });
+
+  player.ammo--;
 }
 
-// SPAWN ENEMY
-function spawnEnemy() {
-  enemies.push({
-    x: Math.random() * (canvas.width - 60) + 30,
-    y: -40,
-    size: 35,
-    speed: 2 + level * 0.3,
-    shootCooldown: 0
-  });
+// ===== AUTO RELOAD =====
+function reload() {
+  if (player.reloading) return;
+  player.reloading = true;
+
+  setTimeout(() => {
+    player.ammo = player.maxAmmo;
+    player.reloading = false;
+  }, 500);
 }
 
+// ===== MOVE PLAYER =====
+function movePlayer() {
+  if (keys["w"]) player.y -= player.speed;
+  if (keys["s"]) player.y += player.speed;
+  if (keys["a"]) player.x -= player.speed;
+  if (keys["d"]) player.x += player.speed;
+}
+
+// ===== SPAWN ENEMY =====
+function spawnEnemies(n) {
+  for (let i = 0; i < n; i++) {
+    enemies.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: 15,
+      hp: 4
+    });
+  }
+}
+
+// ===== ENEMY AIMBOT =====
 setInterval(() => {
-  spawnEnemy();
-}, 1000);
-
-// UPDATE
-function update() {
-  if (moveLeft)  player.x -= player.speed;
-  if (moveRight) player.x += player.speed;
-
-  player.x = Math.max(player.size / 2,
-    Math.min(canvas.width - player.size / 2, player.x)
-  );
-
-  bullets.forEach(b => {
-    b.x += b.vx;
-    b.y += b.vy;
-  });
-
-  enemyBullets.forEach(b => {
-    b.y += b.speed;
-  });
+  if (!gameRunning) return;
 
   enemies.forEach(e => {
-    e.y += e.speed;
-    e.shootCooldown--;
+    const angle = Math.atan2(player.y - e.y, player.x - e.x);
+    enemyBullets.push({
+      x: e.x,
+      y: e.y,
+      vx: Math.cos(angle) * ENEMY_BULLET_SPEED,
+      vy: Math.sin(angle) * ENEMY_BULLET_SPEED
+    });
+  });
+}, 5000);
 
-    if (e.shootCooldown <= 0) {
-      enemyBullets.push({
-        x: e.x,
-        y: e.y,
-        speed: player.bulletSpeed * 0.75 // 3/4 speed
-      });
-      e.shootCooldown = 60;
-    }
+// ===== RESET GAME =====
+function resetGame() {
+  player.x = canvas.width / 2;
+  player.y = canvas.height / 2;
+  player.hp = 10;
+  player.ammo = player.maxAmmo;
+
+  bullets = [];
+  enemyBullets = [];
+  enemies = [];
+
+  spawnEnemies(currentLevel * 3);
+}
+
+// ===== MENU =====
+function startGame() {
+  document.getElementById("menu").style.display = "none";
+  canvas.style.display = "block";
+  gameRunning = true;
+  resetGame();
+  gameLoop();
+}
+
+function startLevel(lv) {
+  currentLevel = lv;
+  startGame();
+}
+
+function openShop() {
+  alert("SHOP\nRPG (100$)\nShotgun (60$)\nSMG (40$)");
+}
+
+// ===== WIN =====
+function winLevel() {
+  gameRunning = false;
+  money += currentLevel * 50;
+
+  alert("WIN LEVEL " + currentLevel + "\n+" + (currentLevel * 50) + "$");
+  document.getElementById("menu").style.display = "flex";
+  canvas.style.display = "none";
+}
+
+// ===== GAME LOOP =====
+function gameLoop() {
+  if (!gameRunning) return;
+  requestAnimationFrame(gameLoop);
+
+  ctx.fillStyle = "#deb887";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  movePlayer();
+  if (player.ammo <= 0) reload();
+
+  // PLAYER
+  ctx.fillStyle = "#8b5a2b";
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // BULLETS
+  ctx.fillStyle = "#e6c28b";
+  bullets.forEach((b, i) => {
+    b.x += b.vx;
+    b.y += b.vy;
+    ctx.fillRect(b.x, b.y, 4, 4);
   });
 
-  // COLLISION PLAYER BULLET -> ENEMY
+  // ENEMY BULLETS
+  ctx.fillStyle = "#5a3a1a";
+  enemyBullets.forEach(b => {
+    b.x += b.vx;
+    b.y += b.vy;
+    ctx.fillRect(b.x, b.y, 4, 4);
+  });
+
+  // ENEMIES
+  ctx.fillStyle = "#a47148";
   enemies.forEach((e, ei) => {
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+    ctx.fill();
+
     bullets.forEach((b, bi) => {
-      if (
-        b.x > e.x - e.size &&
-        b.x < e.x + e.size &&
-        b.y > e.y &&
-        b.y < e.y + e.size
-      ) {
-        enemies.splice(ei, 1);
+      const d = Math.hypot(b.x - e.x, b.y - e.y);
+      if (d < e.r) {
+        e.hp--;
         bullets.splice(bi, 1);
-        score++;
+        if (e.hp <= 0) enemies.splice(ei, 1);
       }
     });
   });
 
-  // COLLISION ENEMY BULLET -> PLAYER
-  enemyBullets.forEach(b => {
-    if (
-      b.x > player.x - player.size &&
-      b.x < player.x + player.size &&
-      b.y > player.y &&
-      b.y < player.y + player.size
-    ) {
-      alert("Game Over\nScore: " + score);
-      location.reload();
-    }
-  });
-
-  // LEVEL UP
-  if (score > level * 10) {
-    level++;
-  }
-}
-
-// DRAW
-function draw() {
-  ctx.fillStyle = "#0b0b0b";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // PLAYER
-  ctx.fillStyle = "#00ffff";
-  ctx.fillRect(
-    player.x - player.size / 2,
-    player.y,
-    player.size,
-    player.size
-  );
-
-  // PLAYER BULLETS
-  ctx.fillStyle = "yellow";
-  bullets.forEach(b => {
-    ctx.fillRect(b.x - 3, b.y - 3, 6, 6);
-  });
-
-  // ENEMIES
-  ctx.fillStyle = "red";
-  enemies.forEach(e => {
-    ctx.fillRect(e.x - e.size / 2, e.y, e.size, e.size);
-  });
-
-  // ENEMY BULLETS
-  ctx.fillStyle = "orange";
-  enemyBullets.forEach(b => {
-    ctx.fillRect(b.x - 3, b.y, 6, 12);
-  });
-
-  // HUD
-  ctx.fillStyle = "white";
+  // UI
+  ctx.fillStyle = "#4b2e14";
   ctx.font = "18px Arial";
-  ctx.fillText("Score: " + score, 10, 25);
-  ctx.fillText("Level: " + level, 10, 45);
-}
+  ctx.fillText("HP: " + player.hp, 20, 30);
+  ctx.fillText("Ammo: " + player.ammo, 20, 55);
+  ctx.fillText("Money: $" + money, 20, 80);
 
-// LOOP
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
+  if (enemies.length === 0) winLevel();
 }
-loop();

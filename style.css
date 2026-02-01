@@ -1,0 +1,56 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #c19a6b;
+  font-family: Arial, sans-serif;
+}
+
+/* ===== MENU ===== */
+#menu {
+  position: absolute;
+  inset: 0;
+  background: #deb887;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+#menu h1 {
+  font-size: 42px;
+  color: #5a3a1a;
+  margin-bottom: 10px;
+}
+
+/* ===== BUTTON ===== */
+button {
+  padding: 12px 32px;
+  font-size: 18px;
+  border: none;
+  border-radius: 10px;
+  background: #8b5a2b;
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+button:hover {
+  background: #5a3a1a;
+  transform: scale(1.05);
+}
+
+.levels {
+  display: flex;
+  gap: 10px;
+}
+
+/* ===== CANVAS ===== */
+canvas {
+  display: none;
+  background: #deb887;
+}
